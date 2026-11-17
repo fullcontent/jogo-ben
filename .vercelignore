@@ -3,3 +3,5 @@ dados
 servidor.py
 iniciar.bat
 __pycache__
+node_modules
+.env.local

@@ -1,0 +1,9 @@
+{
+  "name": "jogo-ben",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Sala de Jogos: Onde fica? e Trem do Brasil",
+  "dependencies": {
+    "@vercel/blob": "2.9.0"
+  }
+}

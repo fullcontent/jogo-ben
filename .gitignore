@@ -4,3 +4,6 @@ dados/
 __pycache__/
 
 .vercel
+.env*
+node_modules/
+.env*

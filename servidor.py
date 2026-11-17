@@ -25,15 +25,34 @@ def ler():
         return {}
 
 
-def gravar(dados):
+def gravar_sem_trava(dados):
     os.makedirs(PASTA_DADOS, exist_ok=True)
-    with trava:
-        if os.path.exists(ARQ):
-            shutil.copyfile(ARQ, BKP)          # copia de seguranca da versao anterior
-        tmp = ARQ + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(dados, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, ARQ)                   # troca atomica: nunca fica pela metade
+    if os.path.exists(ARQ):
+        shutil.copyfile(ARQ, BKP)              # copia de seguranca da versao anterior
+    tmp = ARQ + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(dados, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, ARQ)                       # troca atomica: nunca fica pela metade
+
+
+def juntar(chave, atual, novo):
+    """Junta o valor novo com o que ja esta salvo (varios aparelhos jogando)."""
+    if atual is None:
+        return novo
+    try:
+        if chave.startswith("ondefica_best_"):
+            return str(max(float(atual or 0), float(novo or 0)).__int__())
+        if chave == "tremBrasil_ranking":
+            vistos, todas = set(), []
+            for e in json.loads(atual) + json.loads(novo):
+                k = "%s|%s" % (e.get("t"), e.get("nome"))
+                if k not in vistos:
+                    vistos.add(k); todas.append(e)
+            todas.sort(key=lambda e: e.get("t", 0), reverse=True)
+            return json.dumps(todas[:600], ensure_ascii=False)
+    except (ValueError, TypeError, AttributeError):
+        pass
+    return novo
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -69,10 +88,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             n = int(self.headers.get("Content-Length", 0))
             if n > 5_000_000:
                 return self._json(413, {"erro": "grande demais"})
-            dados = json.loads(self.rfile.read(n).decode("utf-8"))
-            if not isinstance(dados, dict):
+            corpo = json.loads(self.rfile.read(n).decode("utf-8"))
+            if not isinstance(corpo, dict):
                 raise ValueError("esperado um objeto")
-            gravar(dados)
+            with trava:
+                atual = ler()
+                if corpo.get("_patch") is True:            # formato novo: so o que mudou
+                    for k in corpo.get("del") or []:
+                        atual.pop(k, None)
+                    mesclado = {}
+                    for k, v in (corpo.get("set") or {}).items():
+                        if isinstance(v, str):
+                            atual[k] = juntar(k, atual.get(k), v)
+                            mesclado[k] = atual[k]
+                    gravar_sem_trava(atual)
+                    return self._json(200, {"ok": True, "merged": mesclado})
+                gravar_sem_trava(corpo)                    # formato antigo: substitui tudo
             self._json(200, {"ok": True})
         except (ValueError, OSError) as e:
             self._json(400, {"erro": str(e)})

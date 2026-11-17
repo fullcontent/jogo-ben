@@ -214,11 +214,12 @@ $("tabJogos").onclick = () => aba("jogos");
 $("tabPerfis").onclick = () => aba("perfis");
 $("avisoBtn").onclick = () => { aba("perfis"); abreForm(null); };
 
+const emCasa = /^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) || location.protocol === "file:";
 $("rodape").innerHTML = window.ARMAZEM_ARQUIVO
-  ? "💾 Perfis e recordes salvos no arquivo <b>dados/dados.json</b>."
-  : (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) || location.protocol === "file:"
-      ? "⚠️ Salvando só neste navegador (pode sumir). Para salvar no arquivo, abra pelo <b>iniciar.bat</b>."
-      : "💾 Perfis e recordes ficam salvos neste aparelho (cada celular/computador tem os seus).");
+  ? (emCasa ? "💾 Perfis e recordes salvos no arquivo <b>dados/dados.json</b> (só neste computador)."
+            : "☁️ Perfis e recordes salvos no <b>servidor online</b> – aparecem em qualquer aparelho.")
+  : (emCasa ? "⚠️ Salvando só neste navegador (pode sumir). Para salvar no arquivo, abra pelo <b>iniciar.bat</b>."
+            : "⚠️ Servidor fora do ar: salvando só neste aparelho por enquanto.");
 desenhaPerfis();
 let inicial = "jogos";
 try { inicial = sessionStorage.getItem("aba_sala") || (Perfis.lista().length ? "jogos" : "perfis"); } catch(e){}

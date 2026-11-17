@@ -216,7 +216,9 @@ $("avisoBtn").onclick = () => { aba("perfis"); abreForm(null); };
 
 $("rodape").innerHTML = window.ARMAZEM_ARQUIVO
   ? "💾 Perfis e recordes salvos no arquivo <b>dados/dados.json</b>."
-  : "⚠️ Salvando só neste navegador (pode sumir). Para salvar no arquivo, abra pelo <b>iniciar.bat</b>.";
+  : (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname) || location.protocol === "file:"
+      ? "⚠️ Salvando só neste navegador (pode sumir). Para salvar no arquivo, abra pelo <b>iniciar.bat</b>."
+      : "💾 Perfis e recordes ficam salvos neste aparelho (cada celular/computador tem os seus).");
 desenhaPerfis();
 let inicial = "jogos";
 try { inicial = sessionStorage.getItem("aba_sala") || (Perfis.lista().length ? "jogos" : "perfis"); } catch(e){}

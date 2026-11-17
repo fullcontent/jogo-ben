@@ -72,6 +72,15 @@
   .btn{background:var(--accent);color:#2a1f00;font-weight:800;padding:11px 24px;border-radius:12px;box-shadow:0 3px 0 #b88f16;font-size:16px}
   .btn.sec{background:#24405f;color:var(--ink);box-shadow:0 3px 0 #10294a}
   .erro{color:var(--bad);font-weight:700;margin-top:8px;min-height:20px;text-align:center}
+  .form .dica{color:var(--muted);font-size:13px;margin-top:8px;line-height:1.4}
+  .form .chk{display:flex;align-items:center;gap:8px;font-weight:600;color:var(--ink);margin-top:12px;cursor:pointer}
+  .form .chk input{width:auto}
+  .pn .lock{font-size:15px;margin-left:4px}
+  .modal{position:fixed;inset:0;background:rgba(3,10,20,.82);display:flex;align-items:center;justify-content:center;
+    padding:16px;z-index:50}
+  .modal .form{width:100%;max-width:380px}
+  .modal .mstexto{color:var(--muted);text-align:center;margin:0 0 12px;line-height:1.4}
+  .modal .msdica{color:var(--accent);text-align:center;margin-top:6px;font-size:14px}
   footer{margin-top:34px;color:var(--muted);font-size:14px}
 </style>
 </head>
@@ -118,6 +127,12 @@
       <input id="inNome" maxlength="14" placeholder="Como você se chama?" autocomplete="off">
       <label>Escolha sua figurinha</label>
       <div class="avs" id="avs"></div>
+      <label for="inSenha" id="lbSenha">🔒 Senha (opcional)</label>
+      <input id="inSenha" type="password" maxlength="30" placeholder="Em branco = sem senha" autocomplete="new-password">
+      <input id="inSenha2" type="password" maxlength="30" placeholder="Repita a senha" autocomplete="new-password" style="margin-top:8px">
+      <input id="inDica" maxlength="40" placeholder="Dica da senha (opcional, aparece se errar)" autocomplete="off" style="margin-top:8px">
+      <label class="chk hidden" id="rowRemover"><input type="checkbox" id="chkRemover"> Tirar a senha deste perfil</label>
+      <div class="dica">Com senha, só entra no perfil quem souber: para usar, editar e apagar. Se esquecer, não dá para recuperar.</div>
       <div class="erro" id="erro"></div>
       <div class="linha">
         <button class="btn" id="btnSalvar">💾 Salvar</button>
@@ -127,6 +142,20 @@
   </section>
 
   <footer id="rodape"></footer>
+
+  <div class="modal hidden" id="modalSenha">
+    <div class="form">
+      <h2>🔒 Perfil protegido</h2>
+      <p class="mstexto" id="msTexto"></p>
+      <input id="msInput" type="password" maxlength="30" placeholder="Digite a senha" autocomplete="current-password">
+      <div class="erro" id="msErro"></div>
+      <div class="msdica" id="msDica"></div>
+      <div class="linha">
+        <button class="btn" id="msOk">Entrar</button>
+        <button class="btn sec" id="msCancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
 </main>
 
 <script src="lib/perfis.js"></script>
@@ -156,7 +185,7 @@ function desenhaPerfis(){
     <div class="perfil ${ativo && ativo.id === p.id ? "ativo" : ""}">
       ${ativo && ativo.id === p.id ? '<span class="badge">JOGANDO</span>' : ""}
       <button class="av" data-sel="${p.id}" title="Jogar como ${esc(p.nome)}" style="background:none">${p.avatar}</button>
-      <div class="pn">${esc(p.nome)}</div>
+      <div class="pn">${esc(p.nome)}${Perfis.temSenha(p) ? '<span class="lock" title="Protegido por senha">🔒</span>' : ""}</div>
       <div class="acoes">
         <button class="mini" data-sel="${p.id}">✔ Usar</button>
         <button class="mini" data-edit="${p.id}" title="Editar">✏️</button>
@@ -166,14 +195,40 @@ function desenhaPerfis(){
     `<button class="perfil novo" id="btnNovo"><span class="plus">＋</span>Novo perfil</button>`;
   atualizaQuem();
 }
-$("listaPerfis").addEventListener("click", e => {
+// Pede a senha (se o perfil tiver). Devolve true se pode continuar.
+function pedirSenha(p, texto){
+  return new Promise(resolve => {
+    $("msTexto").textContent = texto; $("msErro").textContent = ""; $("msDica").textContent = "";
+    $("msInput").value = ""; $("modalSenha").classList.remove("hidden"); $("msInput").focus();
+    const fecha = v => { $("modalSenha").classList.add("hidden"); $("msOk").onclick = $("msCancel").onclick = $("msInput").onkeydown = null; resolve(v); };
+    const tentar = () => {
+      const r = Perfis.verificar(p.id, $("msInput").value);
+      if (r.ok) return fecha(true);
+      $("msErro").textContent = r.espere ? "Muitas tentativas. Espere " + r.espere + "s e tente de novo."
+                                         : "Senha errada 🙈 (restam " + r.restam + " tentativas)";
+      if (p.dica && !r.espere) $("msDica").textContent = "💡 Dica: " + p.dica;
+      $("msInput").value = ""; $("msInput").focus();
+    };
+    $("msOk").onclick = tentar; $("msCancel").onclick = () => fecha(false);
+    $("msInput").onkeydown = e => { if (e.key === "Enter") tentar(); else if (e.key === "Escape") fecha(false); };
+  });
+}
+const liberar = async (p, texto) => !Perfis.temSenha(p) || await pedirSenha(p, texto);
+
+$("listaPerfis").addEventListener("click", async e => {
   const b = e.target.closest("button"); if (!b) return;
   if (b.id === "btnNovo") return abreForm(null);
-  if (b.dataset.sel) { Perfis.definirAtivo(b.dataset.sel); desenhaPerfis(); }
-  else if (b.dataset.edit) abreForm(b.dataset.edit);
-  else if (b.dataset.del) {
-    const p = Perfis.lista().find(x => x.id === b.dataset.del);
-    if (p && confirm("Apagar o perfil de " + p.nome + "?\n(Os recordes dele deixam de aparecer.)")) {
+  const id = b.dataset.sel || b.dataset.edit || b.dataset.del;
+  const p = Perfis.lista().find(x => x.id === id); if (!p) return;
+  const ativo = Perfis.ativo();
+  if (b.dataset.sel) {
+    if (ativo && ativo.id === p.id) return;                                   // já é ele
+    if (await liberar(p, "Digite a senha de " + p.nome + " para jogar com este perfil.")) { Perfis.definirAtivo(p.id); desenhaPerfis(); }
+  } else if (b.dataset.edit) {
+    if (await liberar(p, "Digite a senha de " + p.nome + " para editar o perfil.")) abreForm(p.id);
+  } else if (b.dataset.del) {
+    if (!(await liberar(p, "Digite a senha de " + p.nome + " para apagar o perfil."))) return;
+    if (confirm("Apagar o perfil de " + p.nome + "?\n(Os recordes dele deixam de aparecer.)")) {
       Perfis.remover(p.id); fechaForm(); desenhaPerfis();
     }
   }
@@ -194,6 +249,11 @@ function abreForm(id){
   $("inNome").value = p ? p.nome : "";
   avSel = p ? p.avatar : Perfis.AVATARES[Math.floor(Math.random() * Perfis.AVATARES.length)];
   $("erro").textContent = ""; desenhaAvatares();
+  const trancado = Perfis.temSenha(p);
+  $("inSenha").value = $("inSenha2").value = ""; $("chkRemover").checked = false;
+  $("inDica").value = p && p.dica ? p.dica : "";
+  $("lbSenha").textContent = trancado ? "🔒 Nova senha (em branco = manter a atual)" : "🔒 Senha (opcional)";
+  $("rowRemover").classList.toggle("hidden", !trancado);
   $("form").classList.remove("hidden"); $("inNome").focus();
   if (Perfis.lista().length) $("form").scrollIntoView({behavior:"smooth", block:"center"});
 }
@@ -203,8 +263,19 @@ function salvar(){
   if (!nome) { $("erro").textContent = "Escreva um nome 🙂"; $("inNome").focus(); return; }
   const dup = Perfis.lista().some(p => p.id !== editandoId && p.nome.toLowerCase() === nome.toLowerCase());
   if (dup) { $("erro").textContent = "Já existe um perfil com esse nome."; return; }
-  if (editandoId) Perfis.editar(editandoId, nome, avSel);
-  else { const p = Perfis.criar(nome, avSel); Perfis.definirAtivo(p.id); }   // perfil novo já fica ativo
+  const s1 = $("inSenha").value, s2 = $("inSenha2").value, dica = $("inDica").value.trim();
+  const atual = editandoId ? Perfis.lista().find(x => x.id === editandoId) : null;
+  const tirar = $("chkRemover").checked;
+  let senhaArg;                                     // undefined = não mexe na senha
+  if (tirar) senhaArg = null;
+  else if (s1) {
+    if (s1.length < 3) { $("erro").textContent = "A senha precisa ter pelo menos 3 caracteres."; $("inSenha").focus(); return; }
+    if (s1 !== s2) { $("erro").textContent = "As duas senhas não são iguais."; $("inSenha2").focus(); return; }
+    senhaArg = s1;
+  }
+  const ficaTrancado = !tirar && (!!s1 || Perfis.temSenha(atual));
+  if (editandoId) Perfis.editar(editandoId, nome, avSel, senhaArg, ficaTrancado ? dica : null);
+  else { const p = Perfis.criar(nome, avSel, senhaArg, dica); Perfis.definirAtivo(p.id); }   // perfil novo já fica ativo
   fechaForm(); desenhaPerfis();
 }
 $("btnSalvar").onclick = salvar;

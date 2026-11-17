@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Onde fica? – Jogo do Mapa-Múndi</title>
+<style>
+  :root{
+    --sea1:#0b3b66; --sea2:#06223f; --ink:#f4f8ff; --muted:#a9c3e3;
+    --accent:#ffcf4a; --ok:#35c46a; --bad:#ff5a5a; --card:#10294a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--sea2);color:var(--ink);
+    font-family:"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;overflow:hidden}
+  #app{display:flex;flex-direction:column;height:100%}
+
+  header{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#08203a;
+    border-bottom:1px solid #1b4272;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0;margin-right:auto;white-space:nowrap}
+  .stat{background:#0d2b4e;border:1px solid #1b4272;border-radius:10px;padding:5px 12px;font-size:14px;color:var(--muted)}
+  .stat b{color:var(--ink);font-size:16px;margin-left:4px}
+  .iconbtn{background:#0d2b4e;border:1px solid #1b4272;color:var(--ink);border-radius:10px;
+    padding:6px 11px;font-size:15px;cursor:pointer}
+  .iconbtn:hover{background:#15416f}
+
+  #prompt{display:flex;align-items:center;gap:12px;padding:10px 16px;background:#0a2a4d;
+    border-bottom:1px solid #1b4272;min-height:62px;flex-wrap:wrap}
+  #question{font-size:15px;color:var(--muted)}
+  #target{font-size:28px;font-weight:800;color:var(--accent);letter-spacing:.3px}
+  #prompt .spacer{flex:1}
+  .btn{background:var(--accent);color:#2a1f00;border:0;border-radius:12px;padding:9px 16px;
+    font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 3px 0 #b88f16}
+  .btn:active{transform:translateY(2px);box-shadow:0 1px 0 #b88f16}
+  .btn.sec{background:#1b4272;color:var(--ink);box-shadow:0 3px 0 #10294a}
+  .btn[disabled]{opacity:.45;cursor:default}
+
+  #mapwrap{position:relative;flex:1;min-height:0;
+    background:radial-gradient(ellipse at 50% 40%,var(--sea1),var(--sea2) 80%)}
+  svg{width:100%;height:100%;display:block;touch-action:none}
+  .sphere{fill:#0e4a80;stroke:#2a6aa8;stroke-width:1.2;vector-effect:non-scaling-stroke}
+  .country{stroke:rgba(255,255,255,.75);stroke-width:.7;vector-effect:non-scaling-stroke;transition:fill .25s}
+  .country.deco{fill:#8294a8 !important;opacity:.55}
+  .country.play{cursor:pointer}
+  .country.play:hover{filter:brightness(1.25)}
+  .country.ok{fill:var(--ok) !important}
+  .country.miss{fill:#ff9d2e !important}
+  .country.bad{fill:var(--bad) !important}
+
+  .stat.low{border-color:var(--bad);animation:pulse .5s infinite alternate}
+  .stat.low b{color:var(--bad)}
+  @keyframes pulse{to{transform:scale(1.12)}}
+  .clabel{fill:#fff;font-weight:800;paint-order:stroke;stroke:#0a2a4d;text-anchor:middle;
+    pointer-events:none;opacity:0;transition:opacity .3s;letter-spacing:.5px}
+  .clabel.on{opacity:.95}
+  #zoombtns{position:absolute;right:14px;top:14px;display:flex;flex-direction:column;gap:6px}
+  #toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);
+    background:rgba(8,32,58,.95);border:1px solid #2a6aa8;border-radius:14px;padding:10px 20px;
+    font-size:18px;font-weight:700;opacity:0;pointer-events:none;transition:.25s;text-align:center;max-width:90%}
+  #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  #toast.ok{border-color:var(--ok)} #toast.bad{border-color:var(--bad)} #toast.miss{border-color:#ff9d2e}
+  #tip{position:fixed;pointer-events:none;background:#08203a;border:1px solid #2a6aa8;border-radius:8px;
+    padding:4px 10px;font-size:14px;font-weight:600;display:none;z-index:5}
+
+  .overlay{position:absolute;inset:0;background:rgba(3,14,28,.78);display:flex;align-items:center;
+    justify-content:center;padding:16px;z-index:10;overflow:auto}
+  .card{background:var(--card);border:1px solid #2a6aa8;border-radius:20px;padding:26px 30px;
+    max-width:460px;width:100%;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .card h2{margin:0 0 6px;font-size:30px}
+  .card p{margin:6px 0 16px;color:var(--muted);line-height:1.45}
+  .globe{font-size:54px;line-height:1}
+  .choices{display:flex;flex-direction:column;gap:10px;margin:14px 0}
+  .choices .btn{display:flex;justify-content:space-between;align-items:center;text-align:left;font-size:16px}
+  .choices small{font-weight:500;opacity:.8}
+  .hidden{display:none !important}
+  .big{font-size:48px;font-weight:800;color:var(--accent)}
+  html{-webkit-text-size-adjust:100%}
+  body{-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+  #app{height:100dvh}
+  @media (max-width:700px){
+    header{padding:6px 10px;gap:6px}
+    header h1{font-size:15px}
+    .stat{padding:3px 8px;font-size:12px} .stat b{font-size:14px}
+    .iconbtn{padding:6px 10px;font-size:14px}
+    #prompt{padding:6px 10px;gap:8px;min-height:0}
+    #question{font-size:13px}
+    #target{font-size:22px}
+    .btn{padding:8px 12px;font-size:14px}
+    #zoombtns{top:8px;right:8px}
+    #zoombtns .iconbtn{padding:9px 13px;font-size:18px}
+    #toast{font-size:15px;bottom:12px;padding:8px 14px}
+    .card{padding:18px} .card h2{font-size:24px} .globe{font-size:40px}
+  }
+  @media (max-width:480px){ header h1{display:none} }
+  /* Celular em pé: o jogo inteiro gira 90° para usar a tela toda (mapa bem maior) */
+  body.girado{position:fixed;inset:0;overflow:hidden}
+  body.girado #app{position:fixed;top:0;left:0;width:100dvh;height:100vw;transform-origin:top left;
+    transform:translateX(100vw) rotate(90deg)}
+  @media (pointer:coarse){
+    .country.play:hover{filter:none}                 /* sem "hover" preso no toque */
+    .choices .btn{padding:13px 16px}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>🌍 Onde fica?</h1>
+    <a class="iconbtn" href="index.html" title="Voltar à sala de jogos" style="text-decoration:none">🎮 Jogos</a>
+    <div class="stat" id="who" title="Perfil que está jogando"></div>
+    <div class="stat hidden" id="statTime">⏱ <b id="sTime">60</b>s</div>
+    <div class="stat"><span id="sRoundLbl">Pergunta</span> <b id="sRound">0/10</b></div>
+    <div class="stat">Pontos <b id="sScore">0</b></div>
+    <div class="stat">Sequência <b id="sStreak">0</b> 🔥</div>
+    <button class="iconbtn hidden" id="btnRot" title="Girar a tela">🔄</button>
+    <button class="iconbtn" id="btnMute" title="Som">🔊</button>
+    <button class="iconbtn" id="btnMenu" title="Menu">☰</button>
+  </header>
+
+  <div id="prompt">
+    <span id="question">Escolha um modo para começar</span>
+    <span id="target"></span>
+    <span class="spacer"></span>
+    <button class="btn sec" id="btnHint">💡 Dica</button>
+    <button class="btn sec" id="btnSkip">⏭ Pular</button>
+  </div>
+
+  <div id="mapwrap">
+    <svg id="map" viewBox="0 0 960 500" preserveAspectRatio="xMidYMid meet"><g id="g"></g></svg>
+    <div id="zoombtns">
+      <button class="iconbtn" id="zIn">＋</button>
+      <button class="iconbtn" id="zOut">－</button>
+      <button class="iconbtn" id="zReset" title="Mapa inteiro">⤢</button>
+    </div>
+    <div id="toast"></div>
+
+    <div class="overlay" id="menu">
+      <div class="card">
+        <div class="globe">🌎</div>
+        <h2>Onde fica?</h2>
+        <p>Eu digo o nome de um país e você clica nele no mapa-múndi.<br>
+           Dá pra dar zoom com a roda do mouse e arrastar o mapa.</p>
+        <div class="choices">
+          <button class="btn" data-diff="facil">😀 Fácil <small id="best-facil">países grandes</small></button>
+          <button class="btn" data-diff="medio">🤔 Médio <small id="best-medio">mais países</small></button>
+          <button class="btn" data-diff="dificil">🥵 Difícil <small id="best-dificil">todos, até os pequenos</small></button>
+          <button class="btn" style="background:#ff7a59;box-shadow:0 3px 0 #b8452a;color:#fff" data-diff="tempo">⏱ Contra o relógio <small id="best-tempo">60s: ache quantos der!</small></button>
+          <button class="btn sec" data-diff="explorar">🔍 Só explorar o mapa</button>
+        </div>
+        <p style="font-size:13px;margin:0">Acerto de primeira = 100 pts + bônus de sequência. Dica reduz os pontos.</p>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="end">
+      <div class="card">
+        <div class="globe" id="endEmoji">🏆</div>
+        <h2 id="endTitle">Fim de jogo!</h2>
+        <div class="big" id="endScore">0</div>
+        <p id="endText"></p>
+        <div class="choices">
+          <button class="btn" id="btnAgain">🔁 Jogar de novo</button>
+          <button class="btn sec" id="btnToMenu">☰ Trocar de modo</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="tip"></div>
+
+<script src="lib/perfis.js"></script>
+<script src="lib/d3.min.js"></script>
+<script src="lib/topojson-client.min.js"></script>
+<script src="lib/world.js"></script>
+<script>
+// ---------- Nomes em português (código numérico ISO -> nome) ----------
+const NOMES = {
+4:"Afeganistão",8:"Albânia",12:"Argélia",24:"Angola",32:"Argentina",51:"Armênia",36:"Austrália",40:"Áustria",
+31:"Azerbaijão",44:"Bahamas",50:"Bangladesh",112:"Bielorrússia",56:"Bélgica",84:"Belize",204:"Benin",64:"Butão",
+68:"Bolívia",70:"Bósnia e Herzegovina",72:"Botsuana",76:"Brasil",96:"Brunei",100:"Bulgária",854:"Burkina Faso",
+108:"Burundi",116:"Camboja",120:"Camarões",124:"Canadá",140:"República Centro-Africana",148:"Chade",152:"Chile",
+156:"China",170:"Colômbia",178:"República do Congo",180:"RD Congo",188:"Costa Rica",384:"Costa do Marfim",191:"Croácia",
+192:"Cuba",196:"Chipre",203:"Tchéquia",208:"Dinamarca",262:"Djibuti",214:"República Dominicana",218:"Equador",
+818:"Egito",222:"El Salvador",226:"Guiné Equatorial",232:"Eritreia",233:"Estônia",231:"Etiópia",238:"Ilhas Malvinas",
+242:"Fiji",246:"Finlândia",250:"França",266:"Gabão",270:"Gâmbia",268:"Geórgia",276:"Alemanha",288:"Gana",300:"Grécia",
+304:"Groenlândia",320:"Guatemala",324:"Guiné",624:"Guiné-Bissau",328:"Guiana",332:"Haiti",340:"Honduras",348:"Hungria",
+352:"Islândia",356:"Índia",360:"Indonésia",364:"Irã",368:"Iraque",372:"Irlanda",376:"Israel",380:"Itália",388:"Jamaica",
+392:"Japão",400:"Jordânia",398:"Cazaquistão",404:"Quênia",408:"Coreia do Norte",410:"Coreia do Sul",414:"Kuwait",
+417:"Quirguistão",418:"Laos",428:"Letônia",422:"Líbano",426:"Lesoto",430:"Libéria",434:"Líbia",440:"Lituânia",
+442:"Luxemburgo",450:"Madagascar",454:"Malaui",458:"Malásia",466:"Mali",478:"Mauritânia",484:"México",498:"Moldávia",
+496:"Mongólia",499:"Montenegro",504:"Marrocos",508:"Moçambique",104:"Mianmar",516:"Namíbia",524:"Nepal",
+528:"Países Baixos",540:"Nova Caledônia",554:"Nova Zelândia",558:"Nicarágua",562:"Níger",566:"Nigéria",578:"Noruega",
+512:"Omã",586:"Paquistão",591:"Panamá",598:"Papua-Nova Guiné",600:"Paraguai",604:"Peru",608:"Filipinas",616:"Polônia",
+620:"Portugal",630:"Porto Rico",634:"Catar",642:"Romênia",643:"Rússia",646:"Ruanda",682:"Arábia Saudita",686:"Senegal",
+688:"Sérvia",694:"Serra Leoa",703:"Eslováquia",705:"Eslovênia",90:"Ilhas Salomão",706:"Somália",710:"África do Sul",
+724:"Espanha",144:"Sri Lanka",729:"Sudão",728:"Sudão do Sul",740:"Suriname",748:"Essuatíni",752:"Suécia",756:"Suíça",
+760:"Síria",158:"Taiwan",762:"Tadjiquistão",834:"Tanzânia",764:"Tailândia",626:"Timor-Leste",768:"Togo",
+780:"Trinidad e Tobago",788:"Tunísia",792:"Turquia",795:"Turcomenistão",800:"Uganda",804:"Ucrânia",
+784:"Emirados Árabes Unidos",826:"Reino Unido",840:"Estados Unidos",858:"Uruguai",860:"Uzbequistão",548:"Vanuatu",
+862:"Venezuela",704:"Vietnã",887:"Iêmen",894:"Zâmbia",716:"Zimbábue",275:"Palestina",732:"Saara Ocidental",
+807:"Macedônia do Norte"
+};
+const PALETA = ["#f3d28b","#a9d6b0","#f0a58f","#9ec5ea","#cfb3e6","#f4b9cf","#a6dcd5"];   // tons suaves que combinam
+const ROUNDS = 10, W = 960, H = 500;
+
+// ---------- Mapa ----------
+const feats = topojson.feature(WORLD_TOPO, WORLD_TOPO.objects.countries).features;
+const projection = d3.geoNaturalEarth1().fitExtent([[6,6],[W-6,H-6]], {type:"Sphere"});
+const path = d3.geoPath(projection);
+const svg = d3.select("#map"), g = d3.select("#g");
+
+// Continentes (código numérico ISO)
+const CONT_IDS = {
+  "América do Norte":[124,840,484,304,320,84,188,222,340,558,591,192,388,332,214,630,44,780],
+  "América do Sul":[32,68,76,152,170,218,328,600,604,740,858,862,238],
+  "Europa":[8,40,112,56,70,100,191,196,203,208,233,246,250,276,300,348,352,372,380,428,440,442,498,499,528,578,616,620,642,643,688,703,705,724,752,756,804,826,807],
+  "Ásia":[4,51,31,50,64,96,116,156,268,356,360,364,368,376,392,400,398,408,410,414,417,418,422,458,496,104,524,512,586,608,634,682,144,760,158,762,764,626,792,795,784,860,704,887,275],
+  "África":[12,24,204,72,854,108,120,140,148,178,180,384,262,818,226,232,231,266,270,288,324,624,404,426,430,434,450,454,466,478,504,508,516,562,566,646,686,694,706,710,729,728,748,834,768,788,800,894,716,732],
+  "Oceania":[36,554,598,242,90,548,540]
+};
+const CONT = {}; for (const [c,ids] of Object.entries(CONT_IDS)) ids.forEach(i => CONT[i] = c);
+const COR = {"América do Norte":"#f4a261","América do Sul":"#7fc99a","Europa":"#b79ad6",
+             "Ásia":"#f28fb0","África":"#ecc94b","Oceania":"#6fc3e8"};
+// Coloração de mapa: cada país recebe uma cor diferente de todos os vizinhos
+(function(){
+  const viz = topojson.neighbors(WORLD_TOPO.objects.countries.geometries);
+  const ordem = d3.range(feats.length).sort((a,b) => viz[b].length - viz[a].length);
+  const cor = new Array(feats.length).fill(-1);
+  ordem.forEach(i => {
+    const usadas = new Set(viz[i].map(j => cor[j]));
+    let c = 0; while (usadas.has(c)) c++;
+    cor[i] = c % PALETA.length;
+  });
+  feats.forEach((f,i) => f.cor = PALETA[cor[i]]);
+})();
+feats.forEach(f => { f.nome = NOMES[+f.id]; f.cont = CONT[+f.id]; f.area = d3.geoArea(f); });
+const jogaveis = feats.filter(f => f.nome).sort((a,b) => b.area - a.area);
+
+g.append("path").datum({type:"Sphere"}).attr("class","sphere").attr("d",path);
+g.selectAll("path.country").data(feats).join("path")
+  .attr("class", d => "country" + (d.nome ? "" : " deco"))
+  .attr("d", path)
+  .attr("fill", d => d.cor)
+  .each(function(d){ d.el = this; })
+  .on("click", (e,d) => { if (d.nome) onCountry(d); })
+  .on("mousemove", (e,d) => showTip(e,d))
+  .on("mouseleave", hideTip);
+
+// Nomes dos continentes (aparecem no modo Fácil e no Explorar)
+const CLABELS = [["AMÉRICA DO NORTE",-100,45],["AMÉRICA DO SUL",-58,-16],["EUROPA",14,53],
+                 ["ÁSIA",90,48],["ÁFRICA",20,5],["OCEANIA",135,-26]];
+const labG = g.append("g");
+labG.selectAll("text").data(CLABELS).join("text").attr("class","clabel")
+  .attr("x", d => projection([d[1],d[2]])[0]).attr("y", d => projection([d[1],d[2]])[1])
+  .attr("font-size",13).attr("stroke-width",3).text(d => d[0]);
+
+const zoom = d3.zoom().scaleExtent([1,16]).extent([[0,0],[W,H]]).translateExtent([[0,0],[W,H]])
+  .on("zoom", e => {
+    g.attr("transform", e.transform);
+    labG.selectAll("text").attr("font-size", 13/e.transform.k).attr("stroke-width", 3/e.transform.k);
+  });
+svg.call(zoom).on("dblclick.zoom", null);
+const zTo = (t, ms=600) => svg.transition().duration(ms).call(zoom.transform, t);
+const resetZoom = () => zTo(d3.zoomIdentity);
+function zoomTo(d, maxK){
+  const [[x0,y0],[x1,y1]] = path.bounds(d);
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  let k = Math.max(1.4, Math.min(maxK, 0.55/Math.max((x1-x0)/W,(y1-y0)/H)));
+  if (!isFinite(k)) k = maxK;
+  zTo(d3.zoomIdentity.translate(W/2,H/2).scale(k).translate(-cx,-cy), 800);
+}
+document.getElementById("zIn").onclick  = () => svg.transition().duration(250).call(zoom.scaleBy, 1.6);
+document.getElementById("zOut").onclick = () => svg.transition().duration(250).call(zoom.scaleBy, 1/1.6);
+document.getElementById("zReset").onclick = resetZoom;
+
+// ---------- Celular em pé: gira a tela para o mapa ficar grande ----------
+const mqPe = matchMedia("(pointer:coarse) and (orientation:portrait) and (max-width:700px)");
+let girarPref = true;
+function aplicaGiro(){
+  document.body.classList.toggle("girado", mqPe.matches && girarPref);
+  document.getElementById("btnRot").classList.toggle("hidden", !mqPe.matches);
+}
+mqPe.addEventListener("change", () => { girarPref = true; aplicaGiro(); });
+document.getElementById("btnRot").onclick = () => { girarPref = !girarPref; aplicaGiro(); };
+
+// ---------- Som ----------
+let muted = false, ac;
+function beep(freq, dur=.14, type="sine", delay=0){
+  if (muted) return;
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    const t = ac.currentTime + delay, o = ac.createOscillator(), v = ac.createGain();
+    o.type = type; o.frequency.value = freq; v.gain.setValueAtTime(.09,t);
+    v.gain.exponentialRampToValueAtTime(.0001,t+dur);
+    o.connect(v); v.connect(ac.destination); o.start(t); o.stop(t+dur);
+  }catch(e){}
+}
+const sndOk   = () => { beep(660,.12); beep(880,.18,"sine",.1); };
+const sndBad  = () => beep(180,.25,"square");
+const sndEnd  = () => [523,659,784,1047].forEach((f,i)=>beep(f,.2,"triangle",i*.12));
+document.getElementById("btnMute").onclick = e => {
+  muted = !muted; e.currentTarget.textContent = muted ? "🔇" : "🔊";
+};
+
+// ---------- Mensagens divertidas ----------
+// {pais} = país que você clicou por engano | {alvo} = país correto
+const MSG_ACERTO = [
+  "🎯 Na mosca! Você é o GPS da turma!",
+  "🧭 Isso aí, explorador! Nem precisou de bússola.",
+  "🚀 Acertou! A NASA quer falar com você.",
+  "🦸 Superpoder de geografia ativado!",
+  "🌟 Perfeito! Até o globo ficou impressionado.",
+  "🍕 Acertou tão rápido que a pizza nem esfriou!",
+  "🐧 Os pinguins estão aplaudindo lá do Polo Sul!",
+  "🗺️ Mapa dominado. Próximo!",
+  "🎉 Boa! Isso merece uma dança da vitória!",
+  "🧠 Cérebro de cartógrafo detectado!",
+  "🏴‍☠️ Yarr! Você achou o tesouro, capitão!",
+  "🛰️ Satélite confirma: acerto total!",
+  "⚡ Rápido como um raio atravessando o oceano!",
+  "🦖 Até os dinossauros sabiam onde era. Você também!",
+  "👏 Show! Passaporte carimbado!",
+  "🌍 Você não erra nem de olhos fechados!",
+  "🥳 Acertou! Vou até contar pro Cristóvão Colombo.",
+  "🔥 Você está pegando fogo!",
+  "🎒 Mochila pronta, viajante! Era esse mesmo!",
+  "🤩 Uau! Isso foi lindo de ver."
+];
+const MSG_SEQUENCIA = [
+  "🔥 {n} seguidas! Ninguém segura você!",
+  "🚂 Trem da vitória: {n} acertos em fila!",
+  "🌋 {n} em sequência! O mapa está tremendo!",
+  "👑 {n} seguidas! Já pode usar a coroa!"
+];
+const MSG_ERRO = [
+  "🙈 Ops! Aqui é {pais}. Tente de novo!",
+  "🛫 Você pousou em {pais}. Pegue outro voo!",
+  "🐌 Quase! Mas {pais} não é o que procuramos.",
+  "🤭 {pais}? Boa tentativa, mas não foi dessa vez!",
+  "🧭 Sua bússola pirou! Isso é {pais}.",
+  "🦜 O papagaio avisa: aqui é {pais}! Tente outro!",
+  "🌀 Errou, mas nem Colombo acertou de primeira!",
+  "🍌 Escorregou na casca de banana em {pais}!",
+  "📍 Hmm... você achou {pais}. Procure mais um pouquinho!",
+  "🐙 Esse é {pais}. O polvo disse que é por outro lado!",
+  "🤔 Não é por aí! Isso é {pais}.",
+  "🚌 Você pegou o ônibus errado e foi parar em {pais}!",
+  "🎈 Uuups! {pais} fica aí, mas o seu país está em outro lugar.",
+  "🕵️ Pista falsa! Isso é {pais}. Investigue mais!"
+];
+const MSG_REVELA = [
+  "😅 Era {alvo}! Agora você sabe pra próxima!",
+  "📚 {alvo} estava aqui o tempo todo, escondidinho!",
+  "🙃 Era {alvo}! Da próxima ele não escapa.",
+  "🐢 Devagar se vai ao longe! Era {alvo}.",
+  "🧐 Olha ele! {alvo} fica bem aí.",
+  "💡 Anotado: {alvo} mora aqui! Guarde esse lugar.",
+  "🎓 Aprendeu uma nova! Era {alvo}.",
+  "🏝️ {alvo} estava de férias, mas você vai achar ele depois!",
+  "🔎 Era {alvo}! Até os melhores exploradores erram.",
+  "🦊 {alvo} se escondeu bem, né? Foi aqui!"
+];
+const MSG_PULO = [
+  "⏭️ Pulou! {alvo} fica aqui, olha só!",
+  "🏃 Fugiu dessa! Mas {alvo} é bem aqui.",
+  "🎲 Sem problema! Era {alvo}. Bora pro próximo!"
+];
+const MSG_DICA = [
+  "💡 Dica: olha só essa região do mapa!",
+  "🔦 Acendi a lanterna! Procura por aqui.",
+  "🧙 O mago do mapa diz: está por perto!",
+  "👀 Pista: o país está nessa área!"
+];
+const _ultima = {};
+function sorteia(lista, nome){
+  let i; do { i = Math.floor(Math.random()*lista.length); } while (lista.length>1 && i===_ultima[nome]);
+  _ultima[nome] = i; return lista[i];
+}
+const msg = (lista, nome, vars={}) =>
+  sorteia(lista, nome).replace(/\{(\w+)\}/g, (_,k)=> vars[k] ?? "");
+
+// ---------- Estado do jogo ----------
+const $ = id => document.getElementById(id);
+let mode = "menu", diff = "facil", queue = [], idx = 0, score = 0, streak = 0, acertos = 0;
+let target = null, attempts = 0, hinted = false, locked = false, toastT;
+let gameId = 0, timeLeft = 0, timerI = null;
+
+const POOL = { facil: 30, medio: 100, dificil: Infinity, tempo: 100 };
+const MAXTRY = { facil: 3 };               // tentativas por pergunta (padrão 2)
+const TEMPO_TOTAL = 60, PENA_ERRO = 3, PENA_PULO = 5;
+const shuffle = a => { a = a.slice(); for (let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; };
+// Recordes separados por perfil
+const best = d => { try { return +localStorage.getItem(Perfis.chave("ondefica_best_"+d)) || 0; } catch(e){ return 0; } };
+const saveBest = (d,v) => { try { localStorage.setItem(Perfis.chave("ondefica_best_"+d), v); } catch(e){} };
+(function(){
+  const a = Perfis.ativo(), el = document.getElementById("who");
+  el.innerHTML = a ? '<span style="font-size:20px">'+a.avatar+'</span> '+a.nome.replace(/[<>&]/g,"") : "👤 Convidado";
+})();
+
+function refreshBest(){
+  for (const d of ["facil","medio","dificil","tempo"]) {
+    const b = best(d); if (b) $("best-"+d).textContent = "recorde: " + b;
+  }
+}
+const varied = d => d.cor;
+function recolor(){
+  // Fácil e Explorar: cores por continente. Os outros modos: cores variadas.
+  const porContinente = (diff === "facil" && mode === "play") || mode === "explore";
+  g.selectAll("path.country").filter(d => d.nome)
+    .attr("fill", d => porContinente ? COR[d.cont] : varied(d));
+  g.selectAll("text.clabel").classed("on", porContinente);
+}
+function setClasses(){
+  g.selectAll("path.country").classed("play", d => !!d.nome && (mode==="play"||mode==="explore"))
+    .classed("ok",false).classed("miss",false).classed("bad",false);
+}
+function hud(){
+  const tempo = diff === "tempo" && mode === "play";
+  $("sRoundLbl").textContent = tempo ? "Achados" : "Pergunta";
+  $("sRound").textContent = mode==="play" ? (tempo ? acertos : Math.min(idx+1,ROUNDS)+"/"+ROUNDS) : "–";
+  $("sScore").textContent = score; $("sStreak").textContent = streak;
+}
+function toast(msg, cls){
+  const t = $("toast"); t.textContent = msg; t.className = "show " + (cls||"");
+  clearTimeout(toastT); toastT = setTimeout(()=> t.className = cls||"", 2600);
+}
+
+// ----- Cronômetro (modo Contra o relógio) -----
+function showTime(){ $("sTime").textContent = timeLeft; $("statTime").classList.toggle("low", timeLeft <= 10); }
+function stopTimer(){ clearInterval(timerI); timerI = null; }
+function perdeTempo(s){ timeLeft = Math.max(0, timeLeft - s); showTime(); if (timeLeft <= 0) finish(); }
+
+function showMenu(){
+  gameId++; stopTimer(); mode = "menu";
+  $("menu").classList.remove("hidden"); $("end").classList.add("hidden"); $("statTime").classList.add("hidden");
+  $("question").textContent = "Escolha um modo para começar"; $("target").textContent = "";
+  $("btnHint").classList.add("hidden"); $("btnSkip").classList.add("hidden");
+  refreshBest(); recolor(); setClasses(); resetZoom(); hud();
+}
+function start(d){
+  gameId++; stopTimer(); diff = d;
+  $("menu").classList.add("hidden"); $("end").classList.add("hidden"); $("statTime").classList.add("hidden");
+  resetZoom();
+  if (d === "explorar") {
+    mode = "explore"; recolor(); setClasses();
+    $("question").textContent = "Passe o mouse ou clique em um país para ver o nome.";
+    $("target").textContent = ""; $("btnHint").classList.add("hidden"); $("btnSkip").classList.add("hidden");
+    hud(); return;
+  }
+  mode = "play"; recolor(); setClasses();
+  queue = shuffle(jogaveis.slice(0, POOL[d]));
+  if (d !== "tempo") queue = queue.slice(0, ROUNDS);
+  idx = 0; score = 0; streak = 0; acertos = 0;
+  $("btnSkip").classList.remove("hidden");
+  $("btnHint").classList.toggle("hidden", d === "tempo");
+  if (d === "tempo") {
+    timeLeft = TEMPO_TOTAL; showTime(); $("statTime").classList.remove("hidden");
+    timerI = setInterval(() => { timeLeft--; showTime(); if (timeLeft <= 0) finish(); }, 1000);
+  }
+  nextQuestion();
+}
+function nextQuestion(){
+  if (mode !== "play") return;
+  if (idx >= queue.length) return finish();
+  target = queue[idx]; attempts = 0; hinted = false; locked = false;
+  $("question").textContent = diff === "facil" ? "Encontre no mapa · " + target.cont + ":" : "Encontre no mapa:";
+  $("target").textContent = target.nome;
+  $("btnHint").disabled = false; $("btnSkip").disabled = false;
+  resetZoom(); hud();
+}
+function advance(ms){
+  locked = true; const id = gameId;
+  setTimeout(()=>{ if (id !== gameId || mode !== "play") return; idx++; nextQuestion(); }, ms);
+}
+
+function onCountry(d){
+  if (mode === "explore") { zoomTo(d, 5); toast(d.nome + (d.cont ? "  ·  " + d.cont : "")); return; }
+  if (mode !== "play" || locked) return;
+  const tempo = diff === "tempo";
+  if (d === target) {
+    const bonus = (attempts===0 && !hinted) ? Math.min(streak,5)*10 : 0;
+    const base = attempts===0 ? (hinted?50:100) : (hinted?15:40);
+    const pts = base + bonus;
+    score += pts; acertos++;
+    streak = attempts===0 ? streak+1 : 0;
+    d3.select(d.el).classed("ok", true);
+    const texto = (attempts===0 && streak>=3)
+      ? msg(MSG_SEQUENCIA, "seq", {n: streak})
+      : msg(MSG_ACERTO, "acerto");
+    sndOk(); toast(texto + "  +" + pts, "ok"); hud(); advance(tempo ? 700 : 1700);
+  } else {
+    attempts++; streak = 0; hud(); sndBad();
+    const el = d3.select(d.el).classed("bad", true);
+    setTimeout(()=> el.classed("bad", false), 700);
+    if (tempo) {
+      toast(msg(MSG_ERRO, "erro", {pais: d.nome}) + "  −" + PENA_ERRO + "s", "bad");
+      perdeTempo(PENA_ERRO);
+    } else if (attempts >= (MAXTRY[diff] || 2)) reveal();
+    else toast(msg(MSG_ERRO, "erro", {pais: d.nome}), "bad");
+  }
+}
+function reveal(pulou){
+  d3.select(target.el).classed("miss", true); zoomTo(target, 4);
+  toast(pulou ? msg(MSG_PULO, "pulo", {alvo: target.nome}) : msg(MSG_REVELA, "revela", {alvo: target.nome}), "miss");
+  streak = 0; hud(); advance(2800);
+}
+$("btnSkip").onclick = () => {
+  if (mode !== "play" || locked) return;
+  if (diff === "tempo") {
+    streak = 0; hud(); idx++;
+    toast("⏭️ Pulou! −" + PENA_PULO + "s", "miss");
+    perdeTempo(PENA_PULO); nextQuestion(); return;
+  }
+  attempts = 9; reveal(true);
+};
+$("btnHint").onclick = () => {
+  if (mode!=="play" || locked) return;
+  hinted = true; zoomTo(target, 3.2); toast(msg(MSG_DICA, "dica"), "");
+};
+
+function finish(){
+  if (mode !== "play") return;
+  mode = "end"; gameId++; stopTimer(); sndEnd();
+  const tempo = diff === "tempo";
+  const prev = best(diff), novo = score > prev; if (novo) saveBest(diff, score);
+  $("endScore").textContent = score + " pts";
+  if (tempo) {
+    $("endEmoji").textContent = acertos>=15 ? "🏆" : acertos>=10 ? "🎉" : acertos>=5 ? "👍" : "🌱";
+    $("endTitle").textContent = acertos>=15 ? "Velocidade da luz!" : acertos>=10 ? "Que ritmo!" : acertos>=5 ? "Nada mal!" : "O tempo voa, hein?";
+    $("endText").textContent = "Você achou " + acertos + (acertos===1 ? " país" : " países") + " em " + TEMPO_TOTAL + " segundos!" + (novo ? " 🎖 Novo recorde!" : " Recorde: " + prev + ".");
+  } else {
+    const pct = Math.round(acertos/ROUNDS*100);
+    $("endEmoji").textContent = acertos>=9 ? "🏆" : acertos>=6 ? "🎉" : acertos>=3 ? "👍" : "🌱";
+    $("endTitle").textContent = acertos>=9 ? "Mestre da geografia!" : acertos>=6 ? "Mandou bem!" : acertos>=3 ? "Bom começo!" : "Vamos treinar mais?";
+    $("endText").textContent = acertos + " de " + ROUNDS + " países achados (" + pct + "%)." + (novo ? " 🎖 Novo recorde!" : " Recorde: " + prev + ".");
+  }
+  $("end").classList.remove("hidden"); $("btnHint").classList.add("hidden"); $("btnSkip").classList.add("hidden");
+  $("question").textContent = "Fim da rodada"; $("target").textContent = "";
+  hud(); resetZoom();
+}
+$("btnAgain").onclick = () => start(diff);
+$("btnToMenu").onclick = showMenu;
+$("btnMenu").onclick = showMenu;
+document.querySelectorAll("[data-diff]").forEach(b => b.onclick = () => start(b.dataset.diff));
+
+// ---------- Dica ao passar o mouse (só no modo explorar) ----------
+const tip = $("tip");
+function showTip(e,d){
+  if (mode !== "explore" || !d.nome) { hideTip(); return; }
+  tip.textContent = d.nome; tip.style.display = "block";
+  tip.style.left = (e.clientX + 14) + "px"; tip.style.top = (e.clientY + 14) + "px";
+}
+function hideTip(){ tip.style.display = "none"; }
+
+aplicaGiro();
+showMenu();
+</script>
+</body>
+</html>

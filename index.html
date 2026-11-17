@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sala de Jogos</title>
+<style>
+  :root{--bg:#0f1b2d;--ink:#f4f1e8;--muted:#9fb0c8;--accent:#ffcc33;--panel:#16263d;--ok:#4cd07d;--bad:#ff6b6b}
+  *{box-sizing:border-box}
+  html,body{margin:0;min-height:100%;background:radial-gradient(ellipse at 50% 0%,#1d3557,var(--bg) 70%) fixed;
+    color:var(--ink);font-family:"Segoe UI",system-ui,sans-serif}
+  main{max-width:860px;margin:0 auto;padding:28px 18px 40px;text-align:center}
+  h1{font-size:clamp(28px,6vw,44px);margin:0 0 4px}
+  .sub{color:var(--muted);margin:0 0 20px;font-size:17px}
+  .hidden{display:none !important}
+  button{font:inherit;cursor:pointer;border:0;color:var(--ink)}
+
+  /* abas */
+  .tabs{display:inline-flex;gap:6px;background:#0b1626;padding:5px;border-radius:16px;margin-bottom:24px}
+  .tab{background:transparent;padding:10px 22px;border-radius:12px;font-weight:700;font-size:16px;color:var(--muted)}
+  .tab.on{background:var(--accent);color:#2a1f00}
+  .quem{display:inline-flex;align-items:center;gap:8px;background:#0b1626;border-radius:999px;
+    padding:6px 16px 6px 8px;margin:0 0 22px 12px;font-weight:700;vertical-align:top;margin-top:5px}
+  .quem .av{font-size:26px}
+
+  /* jogos */
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:22px}
+  a.card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:30px 22px;border-radius:22px;
+    text-decoration:none;color:var(--ink);border:2px solid transparent;
+    box-shadow:0 12px 30px rgba(0,0,0,.35);transition:transform .15s,border-color .15s}
+  a.card:hover,a.card:focus-visible{transform:translateY(-6px) rotate(-.6deg);border-color:var(--accent);outline:0}
+  .mapa{background:linear-gradient(160deg,#1b6aa8,#0b3b66)}
+  .trem{background:linear-gradient(160deg,#c0562b,#6e2a14)}
+  .emoji{font-size:72px;line-height:1}
+  .nome{font-size:26px;font-weight:800}
+  .desc{color:#e6eef9;opacity:.9;line-height:1.4;font-size:15px}
+  .play{margin-top:10px;background:var(--accent);color:#2a1f00;font-weight:800;padding:10px 26px;border-radius:12px;box-shadow:0 3px 0 #b88f16}
+  .aviso{background:#3a2f12;border:1px solid #7a6320;border-radius:14px;padding:10px 16px;margin:0 auto 20px;max-width:520px;font-size:15px}
+  .aviso button{background:var(--accent);color:#2a1f00;font-weight:700;padding:5px 12px;border-radius:8px;margin-left:8px}
+
+  /* perfis */
+  .perfis{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:16px;margin-bottom:24px}
+  .perfil{position:relative;background:var(--panel);border:3px solid transparent;border-radius:20px;
+    padding:18px 10px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;
+    box-shadow:0 8px 20px rgba(0,0,0,.3);transition:transform .12s,border-color .12s}
+  .perfil:hover{transform:translateY(-4px)}
+  .perfil.ativo{border-color:var(--accent);background:#1d3355}
+  .perfil .av{font-size:62px;line-height:1;background:none}
+  .perfil .pn{font-size:19px;font-weight:800;word-break:break-word}
+  .perfil .acoes{display:flex;gap:6px;margin-top:4px}
+  .mini{background:#24405f;border-radius:9px;padding:5px 10px;font-size:14px}
+  .mini:hover{background:#2f5580}
+  .mini.red:hover{background:#8a2f2f}
+  .badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--accent);color:#2a1f00;
+    font-size:12px;font-weight:800;padding:2px 10px;border-radius:999px}
+  .novo{background:transparent;border:3px dashed #2f5580;color:var(--muted);justify-content:center;min-height:170px;font-size:18px;font-weight:700}
+  .novo .plus{font-size:50px;line-height:1}
+  .novo:hover{border-color:var(--accent);color:var(--ink)}
+
+  .form{background:var(--panel);border-radius:22px;padding:22px;max-width:560px;margin:0 auto;text-align:left;
+    box-shadow:0 12px 30px rgba(0,0,0,.35)}
+  .form h2{margin:0 0 14px;text-align:center}
+  .form label{font-weight:700;display:block;margin:10px 0 6px;color:var(--muted)}
+  .form input{width:100%;font:inherit;font-size:18px;padding:10px 14px;border-radius:12px;border:2px solid #2f5580;
+    background:#0f1b2d;color:var(--ink)}
+  .form input:focus{outline:0;border-color:var(--accent)}
+  .avs{display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));gap:8px}
+  .avs button{font-size:34px;background:#0f1b2d;border:3px solid transparent;border-radius:14px;padding:4px 0;line-height:1.3}
+  .avs button:hover{background:#1d3355}
+  .avs button.sel{border-color:var(--accent);background:#2a3d5e;transform:scale(1.08)}
+  .linha{display:flex;gap:10px;margin-top:20px;justify-content:center}
+  .btn{background:var(--accent);color:#2a1f00;font-weight:800;padding:11px 24px;border-radius:12px;box-shadow:0 3px 0 #b88f16;font-size:16px}
+  .btn.sec{background:#24405f;color:var(--ink);box-shadow:0 3px 0 #10294a}
+  .erro{color:var(--bad);font-weight:700;margin-top:8px;min-height:20px;text-align:center}
+  footer{margin-top:34px;color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>🎮 Sala de Jogos</h1>
+  <p class="sub">Escolha quem vai jogar e qual jogo vamos abrir!</p>
+
+  <div>
+    <div class="tabs">
+      <button class="tab" id="tabJogos">🎮 Jogos</button>
+      <button class="tab" id="tabPerfis">👤 Perfis</button>
+    </div>
+    <span class="quem hidden" id="quem"><span class="av" id="quemAv"></span><span id="quemNome"></span></span>
+  </div>
+
+  <!-- ABA JOGOS -->
+  <section id="abaJogos">
+    <div class="aviso hidden" id="aviso">Você ainda não escolheu um perfil. Jogue como convidado ou
+      <button id="avisoBtn">Criar perfil</button></div>
+    <div class="grid">
+      <a class="card mapa" href="mapa.html">
+        <span class="emoji">🌍</span>
+        <span class="nome">Onde fica?</span>
+        <span class="desc">Ache os países no mapa-múndi. Tem modo fácil, difícil, contra o relógio e explorar.</span>
+        <span class="play">▶ Jogar</span>
+      </a>
+      <a class="card trem" href="trem_do_brasil.html">
+        <span class="emoji">🚂</span>
+        <span class="nome">Trem do Brasil</span>
+        <span class="desc">Pegue o trenzinho e vá em frente pelo Brasil!</span>
+        <span class="play">▶ Jogar</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ABA PERFIS -->
+  <section id="abaPerfis" class="hidden">
+    <div id="listaPerfis" class="perfis"></div>
+
+    <div class="form hidden" id="form">
+      <h2 id="formTitulo">Novo perfil</h2>
+      <label for="inNome">Nome</label>
+      <input id="inNome" maxlength="14" placeholder="Como você se chama?" autocomplete="off">
+      <label>Escolha sua figurinha</label>
+      <div class="avs" id="avs"></div>
+      <div class="erro" id="erro"></div>
+      <div class="linha">
+        <button class="btn" id="btnSalvar">💾 Salvar</button>
+        <button class="btn sec" id="btnCancelar">Cancelar</button>
+      </div>
+    </div>
+  </section>
+
+  <footer id="rodape"></footer>
+</main>
+
+<script src="lib/perfis.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+let editandoId = null, avSel = Perfis.AVATARES[0];
+
+function aba(qual){
+  $("abaJogos").classList.toggle("hidden", qual !== "jogos");
+  $("abaPerfis").classList.toggle("hidden", qual !== "perfis");
+  $("tabJogos").classList.toggle("on", qual === "jogos");
+  $("tabPerfis").classList.toggle("on", qual === "perfis");
+  if (qual === "perfis") fechaForm();
+  try { sessionStorage.setItem("aba_sala", qual); } catch(e){}
+}
+function atualizaQuem(){
+  const a = Perfis.ativo();
+  $("quem").classList.toggle("hidden", !a);
+  if (a) { $("quemAv").textContent = a.avatar; $("quemNome").textContent = a.nome; }
+  $("aviso").classList.toggle("hidden", !!a);
+}
+function esc(s){ return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+function desenhaPerfis(){
+  const ativo = Perfis.ativo(), box = $("listaPerfis");
+  box.innerHTML = Perfis.lista().map(p => `
+    <div class="perfil ${ativo && ativo.id === p.id ? "ativo" : ""}">
+      ${ativo && ativo.id === p.id ? '<span class="badge">JOGANDO</span>' : ""}
+      <button class="av" data-sel="${p.id}" title="Jogar como ${esc(p.nome)}" style="background:none">${p.avatar}</button>
+      <div class="pn">${esc(p.nome)}</div>
+      <div class="acoes">
+        <button class="mini" data-sel="${p.id}">✔ Usar</button>
+        <button class="mini" data-edit="${p.id}" title="Editar">✏️</button>
+        <button class="mini red" data-del="${p.id}" title="Apagar">🗑️</button>
+      </div>
+    </div>`).join("") +
+    `<button class="perfil novo" id="btnNovo"><span class="plus">＋</span>Novo perfil</button>`;
+  atualizaQuem();
+}
+$("listaPerfis").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.id === "btnNovo") return abreForm(null);
+  if (b.dataset.sel) { Perfis.definirAtivo(b.dataset.sel); desenhaPerfis(); }
+  else if (b.dataset.edit) abreForm(b.dataset.edit);
+  else if (b.dataset.del) {
+    const p = Perfis.lista().find(x => x.id === b.dataset.del);
+    if (p && confirm("Apagar o perfil de " + p.nome + "?\n(Os recordes dele deixam de aparecer.)")) {
+      Perfis.remover(p.id); fechaForm(); desenhaPerfis();
+    }
+  }
+});
+
+function desenhaAvatares(){
+  $("avs").innerHTML = Perfis.AVATARES.map(a =>
+    `<button type="button" data-av="${a}" class="${a === avSel ? "sel" : ""}">${a}</button>`).join("");
+}
+$("avs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  avSel = b.dataset.av; desenhaAvatares();
+});
+function abreForm(id){
+  editandoId = id;
+  const p = id ? Perfis.lista().find(x => x.id === id) : null;
+  $("formTitulo").textContent = p ? "Editar perfil" : "Novo perfil";
+  $("inNome").value = p ? p.nome : "";
+  avSel = p ? p.avatar : Perfis.AVATARES[Math.floor(Math.random() * Perfis.AVATARES.length)];
+  $("erro").textContent = ""; desenhaAvatares();
+  $("form").classList.remove("hidden"); $("inNome").focus();
+  if (Perfis.lista().length) $("form").scrollIntoView({behavior:"smooth", block:"center"});
+}
+function fechaForm(){ $("form").classList.add("hidden"); editandoId = null; }
+function salvar(){
+  const nome = $("inNome").value.trim();
+  if (!nome) { $("erro").textContent = "Escreva um nome 🙂"; $("inNome").focus(); return; }
+  const dup = Perfis.lista().some(p => p.id !== editandoId && p.nome.toLowerCase() === nome.toLowerCase());
+  if (dup) { $("erro").textContent = "Já existe um perfil com esse nome."; return; }
+  if (editandoId) Perfis.editar(editandoId, nome, avSel);
+  else { const p = Perfis.criar(nome, avSel); Perfis.definirAtivo(p.id); }   // perfil novo já fica ativo
+  fechaForm(); desenhaPerfis();
+}
+$("btnSalvar").onclick = salvar;
+$("btnCancelar").onclick = fechaForm;
+$("inNome").addEventListener("keydown", e => { if (e.key === "Enter") salvar(); });
+$("tabJogos").onclick = () => aba("jogos");
+$("tabPerfis").onclick = () => aba("perfis");
+$("avisoBtn").onclick = () => { aba("perfis"); abreForm(null); };
+
+$("rodape").innerHTML = window.ARMAZEM_ARQUIVO
+  ? "💾 Perfis e recordes salvos no arquivo <b>dados/dados.json</b>."
+  : "⚠️ Salvando só neste navegador (pode sumir). Para salvar no arquivo, abra pelo <b>iniciar.bat</b>.";
+desenhaPerfis();
+let inicial = "jogos";
+try { inicial = sessionStorage.getItem("aba_sala") || (Perfis.lista().length ? "jogos" : "perfis"); } catch(e){}
+aba(inicial);
+if (!Perfis.lista().length && inicial === "perfis") abreForm(null);
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+dados/
+.claude/
+.vercel/
+__pycache__/

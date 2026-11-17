@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Trem do Brasil</title>
+<style>
+  :root{--bg:#0f1b2d;--panel:#16263d;--text:#f4f1e8;--muted:#9fb0c8;--accent:#ffcc33;--ok:#4cd07d;--bad:#ff6b6b;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:"Segoe UI",system-ui,sans-serif;
+       display:flex;flex-direction:column;align-items:center;min-height:100vh;padding:10px 16px}
+  #hud{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;font-size:15px;color:var(--muted);margin-bottom:6px}
+  #hud b{color:var(--text);font-size:18px}
+  #pergunta{font-size:22px;font-weight:700;background:var(--panel);padding:10px 18px;border-radius:12px;
+            min-height:50px;text-align:center;width:min(720px,100%)}
+  #pergunta em{font-style:normal;color:var(--accent)}
+  #msg{min-height:26px;margin:6px 0;font-size:16px;text-align:center;width:min(720px,100%)}
+  #msg.ok{color:var(--ok)} #msg.bad{color:var(--bad)}
+  #wrap{position:relative;width:min(720px,100%,calc(100vh - 175px));aspect-ratio:1}
+  canvas{width:100%;height:100%;display:block;border-radius:12px}
+  .overlay{position:absolute;inset:0;background:rgba(10,18,30,.9);display:flex;flex-direction:column;
+           align-items:center;justify-content:center;gap:12px;border-radius:12px;text-align:center;padding:20px}
+  .hidden{display:none!important}
+  .overlay h1{margin:0;font-size:38px}
+  .overlay h2{margin:0;font-size:30px;color:var(--accent)}
+  .overlay p{margin:0;color:var(--muted);max-width:440px;line-height:1.4}
+  .modes{display:grid;grid-template-columns:1fr 1fr;gap:10px;width:min(440px,100%)}
+  button{font:inherit;cursor:pointer;border:0;border-radius:10px;padding:12px 14px;background:#24405f;color:var(--text);
+         text-align:left;transition:transform .1s,background .1s}
+  button:hover{background:#2f5580;transform:translateY(-2px)}
+  button small{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+  button.main{background:var(--accent);color:#1a1a1a;font-weight:700;text-align:center;padding:12px 26px}
+  button.main:hover{background:#ffd95e}
+  label{color:var(--muted)}
+  input{font:inherit;padding:8px 12px;border-radius:8px;border:2px solid #2f5580;background:#0f1b2d;color:var(--text);width:180px;text-align:center}
+  .tecla{display:inline-block;background:#24405f;border-radius:5px;padding:0 6px;color:var(--text)}
+  .overlay{overflow-y:auto}
+  .rank{border-collapse:collapse;width:min(420px,100%);font-size:15px}
+  .rank td{padding:5px 8px;border-bottom:1px solid #24405f;text-align:left}
+  .rank td:nth-child(3){text-align:right;font-weight:700;color:var(--accent)}
+  .rank td:last-child{color:var(--muted);font-size:13px;text-align:right}
+  .rank tr.eu td{background:rgba(255,204,51,.2)}
+  .tabs{display:flex;gap:6px;flex-wrap:wrap;justify-content:center}
+  .tabs button{padding:6px 12px;text-align:center}
+  .tabs button.ativo{background:var(--accent);color:#1a1a1a;font-weight:700}
+  .centro{text-align:center}
+
+  /* ---------- Celular / touchscreen ---------- */
+  html{-webkit-text-size-adjust:100%}
+  body{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+  #wrap,#dpad{user-select:none;-webkit-user-select:none}
+  #wrap{touch-action:none}
+  @media (pointer:coarse){ html,body{overscroll-behavior:none} }
+  .overlay{justify-content:flex-start}
+  .overlay>:first-child{margin-top:auto}
+  .overlay>:last-child{margin-bottom:auto}
+  input{font-size:16px}                      /* evita zoom automático no iPhone */
+  #dpad{display:none}
+  .so-touch{display:none}
+  @media (pointer:coarse), (max-width:700px){
+    #dpad{display:grid;grid-template-areas:". u ." "l c r" ". d .";grid-template-columns:repeat(3,60px);
+          grid-template-rows:repeat(3,60px);gap:6px;margin:8px auto 52px;touch-action:none}
+    #dpad button{padding:0;text-align:center;font-size:26px;border-radius:16px;background:#2a4a70;
+          box-shadow:0 4px 0 #14283f;display:flex;align-items:center;justify-content:center;touch-action:none}
+    #dpad button:active{background:var(--accent);color:#1a1a1a;transform:translateY(3px);box-shadow:none}
+    #btnPausa{font-size:24px!important;background:#1d3355!important}
+    button:hover{transform:none}
+    .so-pc{display:none}
+    .so-touch{display:block}
+    body{padding:6px 8px}
+    #hud{gap:10px;font-size:13px;margin-bottom:4px} #hud b{font-size:15px}
+    #pergunta{font-size:18px;padding:8px 12px;min-height:44px}
+    #msg{font-size:14px;min-height:22px;margin:4px 0}
+    #wrap{width:min(720px,100%,calc(100dvh - 318px));min-width:min(100%,280px)}
+    .overlay h1{font-size:28px} .overlay h2{font-size:24px}
+    .overlay{position:fixed;inset:0;z-index:40;border-radius:0;padding:14px 14px 60px;gap:10px;background:rgba(10,18,30,.97)}
+    .modes button{padding:10px}
+  }
+  /* celular deitado: setas ao lado do mapa */
+  @media (pointer:coarse) and (orientation:landscape) and (max-height:520px){
+    #dpad{position:fixed;right:14px;top:50%;transform:translateY(-50%);margin:0;
+          grid-template-columns:repeat(3,64px);grid-template-rows:repeat(3,64px)}
+    #wrap{width:min(100%,calc(100dvh - 130px))}
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <span>Maquinista: <b id="hNome">Benjamin</b></span>
+  <span>Vagões: <b id="hVagoes">0</b></span>
+  <span>Acertos: <b id="hAcertos">0</b></span>
+  <span>Recorde: <b id="hRecorde">0</b></span>
+</div>
+<a href="index.html" title="Voltar à sala de jogos" style="position:fixed;right:10px;bottom:10px;z-index:50;background:#24405f;color:#f4f1e8;text-decoration:none;padding:8px 14px;border-radius:10px;font:600 14px 'Segoe UI',sans-serif;opacity:.85">🎮 Jogos</a>
+<div id="pergunta">🚂 Trem do Brasil</div>
+<div id="msg"></div>
+<div id="wrap">
+  <canvas id="c"></canvas>
+
+  <div class="overlay" id="telaInicio">
+    <h1>🚂 Trem do Brasil</h1>
+    <p>Dirija o trem pelo mapa e pare na estação certa. Cada acerto ganha um vagão!</p>
+    <div><label>Nome do maquinista: </label><input id="nome" value="Benjamin" maxlength="16"></div>
+    <div class="modes">
+      <button data-mode="capitais">🏛️ Capitais<small>Qual é a capital de cada estado?</small></button>
+      <button data-mode="estados">📍 Estados<small>Onde fica cada estado no mapa?</small></button>
+      <button data-mode="regioes">🧭 Regiões<small>Norte, Nordeste, Sul...</small></button>
+      <button data-mode="misto">⚡ Desafio misto<small>Um pouco de tudo!</small></button>
+    </div>
+    <p class="so-pc"><span class="tecla">← ↑ → ↓</span> ou <span class="tecla">W A S D</span> para dirigir · <span class="tecla">Espaço</span> pausa</p>
+    <p class="so-touch">👆 Use as setas da tela ou deslize o dedo no mapa para dirigir.</p>
+    <p>Cuidado: parar na estação errada, bater na borda ou nos próprios vagões termina a viagem!</p>
+    <button class="centro" id="btnRanking">🏆 Ver recordes</button>
+  </div>
+
+  <div class="overlay hidden" id="telaRanking">
+    <h2>🏆 Recordes</h2>
+    <div class="tabs" id="tabsRanking"></div>
+    <div id="tabelaRanking"></div>
+    <button class="main" id="btnVoltar">Voltar</button>
+  </div>
+
+  <div class="overlay hidden" id="telaFim">
+    <h2>Fim da viagem!</h2>
+    <p id="fimMotivo"></p>
+    <h1 id="fimTexto"></h1>
+    <p id="fimRecorde"></p>
+    <p id="fimVisitados"></p>
+    <div id="fimRanking"></div>
+    <div style="display:flex;gap:10px">
+      <button class="main" id="btnDeNovo">Jogar de novo (Enter)</button>
+      <button id="btnModo">Trocar modo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Controles de toque (aparecem só em celular/tablet) -->
+<div id="dpad" aria-label="Controles">
+  <button data-d="0,-1" style="grid-area:u" aria-label="Cima">▲</button>
+  <button data-d="-1,0" style="grid-area:l" aria-label="Esquerda">◀</button>
+  <button id="btnPausa" style="grid-area:c" aria-label="Pausar">⏸</button>
+  <button data-d="1,0" style="grid-area:r" aria-label="Direita">▶</button>
+  <button data-d="0,1" style="grid-area:d" aria-label="Baixo">▼</button>
+</div>
+
+<script src="lib/perfis.js"></script>
+<script>
+const STATES = [
+  {uf:'AC',nome:'Acre',cap:'Rio Branco',reg:'Norte',lat:-9.97,lon:-67.81},
+  {uf:'AL',nome:'Alagoas',cap:'Maceió',reg:'Nordeste',lat:-9.67,lon:-35.74},
+  {uf:'AP',nome:'Amapá',cap:'Macapá',reg:'Norte',lat:0.03,lon:-51.07},
+  {uf:'AM',nome:'Amazonas',cap:'Manaus',reg:'Norte',lat:-3.12,lon:-60.02},
+  {uf:'BA',nome:'Bahia',cap:'Salvador',reg:'Nordeste',lat:-12.97,lon:-38.51},
+  {uf:'CE',nome:'Ceará',cap:'Fortaleza',reg:'Nordeste',lat:-3.72,lon:-38.54},
+  {uf:'DF',nome:'Distrito Federal',cap:'Brasília',reg:'Centro-Oeste',lat:-15.79,lon:-47.88},
+  {uf:'ES',nome:'Espírito Santo',cap:'Vitória',reg:'Sudeste',lat:-20.32,lon:-40.34},
+  {uf:'GO',nome:'Goiás',cap:'Goiânia',reg:'Centro-Oeste',lat:-16.68,lon:-49.25},
+  {uf:'MA',nome:'Maranhão',cap:'São Luís',reg:'Nordeste',lat:-2.53,lon:-44.30},
+  {uf:'MT',nome:'Mato Grosso',cap:'Cuiabá',reg:'Centro-Oeste',lat:-15.60,lon:-56.10},
+  {uf:'MS',nome:'Mato Grosso do Sul',cap:'Campo Grande',reg:'Centro-Oeste',lat:-20.47,lon:-54.62},
+  {uf:'MG',nome:'Minas Gerais',cap:'Belo Horizonte',reg:'Sudeste',lat:-19.92,lon:-43.94},
+  {uf:'PA',nome:'Pará',cap:'Belém',reg:'Norte',lat:-1.46,lon:-48.50},
+  {uf:'PB',nome:'Paraíba',cap:'João Pessoa',reg:'Nordeste',lat:-7.12,lon:-34.86},
+  {uf:'PR',nome:'Paraná',cap:'Curitiba',reg:'Sul',lat:-25.43,lon:-49.27},
+  {uf:'PE',nome:'Pernambuco',cap:'Recife',reg:'Nordeste',lat:-8.05,lon:-34.88},
+  {uf:'PI',nome:'Piauí',cap:'Teresina',reg:'Nordeste',lat:-5.09,lon:-42.80},
+  {uf:'RJ',nome:'Rio de Janeiro',cap:'Rio de Janeiro',reg:'Sudeste',lat:-22.91,lon:-43.17},
+  {uf:'RN',nome:'Rio Grande do Norte',cap:'Natal',reg:'Nordeste',lat:-5.79,lon:-35.21},
+  {uf:'RS',nome:'Rio Grande do Sul',cap:'Porto Alegre',reg:'Sul',lat:-30.03,lon:-51.23},
+  {uf:'RO',nome:'Rondônia',cap:'Porto Velho',reg:'Norte',lat:-8.76,lon:-63.90},
+  {uf:'RR',nome:'Roraima',cap:'Boa Vista',reg:'Norte',lat:2.82,lon:-60.67},
+  {uf:'SC',nome:'Santa Catarina',cap:'Florianópolis',reg:'Sul',lat:-27.59,lon:-48.55},
+  {uf:'SP',nome:'São Paulo',cap:'São Paulo',reg:'Sudeste',lat:-23.55,lon:-46.63},
+  {uf:'SE',nome:'Sergipe',cap:'Aracaju',reg:'Nordeste',lat:-10.91,lon:-37.07},
+  {uf:'TO',nome:'Tocantins',cap:'Palmas',reg:'Norte',lat:-10.18,lon:-48.33},
+];
+const REGS = ['Norte','Nordeste','Centro-Oeste','Sudeste','Sul'];
+const REG_COR = {'Norte':'#3fa7d6','Nordeste':'#f29e4c','Centro-Oeste':'#b57edc','Sudeste':'#ef476f','Sul':'#06b37a'};
+// Contorno aproximado do Brasil (lat, lon) – só decoração
+const BORDA = [[5.2,-60.2],[4,-59.5],[2,-56.5],[2.2,-54.5],[4.3,-51.6],[1,-50],[-0.5,-48.5],[-1,-46],[-2.5,-44],
+  [-2.8,-41.5],[-3,-39.5],[-4.8,-37],[-5.2,-35.3],[-7.2,-34.8],[-9.5,-35.5],[-11,-37],[-13,-38.5],[-15.5,-39],
+  [-18,-39.6],[-20.5,-40.3],[-22,-41],[-23,-43.5],[-23.8,-45.5],[-25.5,-48.5],[-28.5,-48.8],[-30.5,-50.3],
+  [-33.7,-53.4],[-32.5,-53.2],[-30.2,-57.6],[-27.5,-55.7],[-25.6,-54.6],[-24,-54.3],[-22.3,-55.8],[-22,-58],
+  [-19.8,-58.1],[-17.3,-58.4],[-16.3,-60],[-13.5,-61],[-11.9,-65.3],[-10,-65.4],[-10.9,-68.7],[-11.1,-70.5],
+  [-9.4,-73],[-7.5,-74],[-4.4,-70],[-1.5,-69.4],[1.2,-69.9],[1.7,-67],[0.8,-66.3],[2,-64],[4,-64.5],[4.5,-61]];
+
+const CELL = 16, MARGEM = 3, N = 40 + 2 * MARGEM;   // margem de mar em volta do Brasil
+const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+cv.width = cv.height = CELL * N;
+const px = lon => (lon + 74 + MARGEM) * CELL, py = lat => (5.5 - lat + MARGEM) * CELL;
+STATES.forEach(s => { s.x = Math.floor(s.lon + 74) + MARGEM; s.y = Math.floor(5.5 - s.lat) + MARGEM; });
+const byUF = Object.fromEntries(STATES.map(s => [s.uf, s]));
+
+const $ = id => document.getElementById(id);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+const dist = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+// ---------- Som ----------
+let audio;
+function tom(freq, dur, type = 'square', vol = 0.06, delay = 0) {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const o = audio.createOscillator(), g = audio.createGain(), t = audio.currentTime + delay;
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g).connect(audio.destination); o.start(t); o.stop(t + dur);
+  } catch (e) {}
+}
+const somAcerto = () => { tom(660, .12); tom(880, .12, 'square', .06, .1); tom(1175, .2, 'square', .06, .2); };
+const somErro = () => { tom(220, .25, 'sawtooth', .05); };
+const somFim = () => { tom(440, .2, 'triangle', .1); tom(330, .2, 'triangle', .1, .2); tom(220, .4, 'triangle', .1, .4); };
+const somApito = () => { tom(587, .35, 'triangle', .08); tom(740, .35, 'triangle', .06); };
+
+// ---------- Recorde ----------
+const MODO_NOME = { capitais: '🏛️ Capitais', estados: '📍 Estados', regioes: '🧭 Regiões', misto: '⚡ Misto' };
+const CHAVE_RANK = 'tremBrasil_ranking';
+const ordem = (a, b) => b.acertos - a.acertos || a.t - b.t;
+function lerRanking() { try { return JSON.parse(localStorage.getItem(CHAVE_RANK)) || []; } catch (e) { return []; } }
+function salvarRanking(r) { try { localStorage.setItem(CHAVE_RANK, JSON.stringify(r)); } catch (e) {} }
+// Cada jogador aparece uma vez só, com o seu melhor resultado (ignora emoji/maiúsculas no nome)
+const chaveJogador = s => String(s).replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+const topModo = (m, n = 10) => {
+  const melhor = new Map();
+  lerRanking().filter(r => r.modo === m).sort(ordem).forEach(r => {
+    const k = chaveJogador(r.nome); if (!melhor.has(k)) melhor.set(k, r);
+  });
+  return [...melhor.values()].slice(0, n);
+};
+const lerRecorde = m => (topModo(m, 1)[0] || { acertos: 0 }).acertos;
+function registrarPartida() {
+  const e = { nome, modo, acertos, data: new Date().toLocaleDateString('pt-BR'), t: Date.now() };
+  const r = lerRanking(); r.push(e);
+  const manter = [];
+  Object.keys(MODO_NOME).forEach(m => manter.push(...r.filter(x => x.modo === m).sort(ordem).slice(0, 50)));
+  salvarRanking(manter);
+  return e;
+}
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function tabelaHTML(m, destaque, n = 10) {
+  const top = topModo(m, n);
+  if (!top.length) return '<p>Nenhum recorde ainda. Seja o primeiro!</p>';
+  return '<table class="rank">' + top.map((r, i) =>
+    `<tr class="${destaque && chaveJogador(r.nome) === chaveJogador(destaque.nome) ? 'eu' : ''}"><td>${['🥇', '🥈', '🥉'][i] || (i + 1) + 'º'}</td>` +
+    `<td>${esc(r.nome)}</td><td>${r.acertos}</td><td>${r.data}</td></tr>`).join('') + '</table>';
+}
+function mostrarRanking(m) {
+  $('tabsRanking').innerHTML = Object.entries(MODO_NOME).map(([k, v]) =>
+    `<button data-rank="${k}" class="${k === m ? 'ativo' : ''}">${v}</button>`).join('');
+  $('tabsRanking').querySelectorAll('button').forEach(b => b.onclick = () => mostrarRanking(b.dataset.rank));
+  $('tabelaRanking').innerHTML = tabelaHTML(m);
+}
+
+// ---------- Mapa de fundo ----------
+const fundo = document.createElement('canvas'); fundo.width = fundo.height = CELL * N;
+(function desenharFundo() {
+  const g = fundo.getContext('2d');
+  const grad = g.createLinearGradient(0, 0, 0, fundo.height);
+  grad.addColorStop(0, '#16426b'); grad.addColorStop(1, '#0d2b4a');
+  g.fillStyle = grad; g.fillRect(0, 0, fundo.width, fundo.height);
+  g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1;
+  for (let i = 0; i <= N; i++) {
+    g.beginPath(); g.moveTo(i * CELL, 0); g.lineTo(i * CELL, N * CELL); g.stroke();
+    g.beginPath(); g.moveTo(0, i * CELL); g.lineTo(N * CELL, i * CELL); g.stroke();
+  }
+  g.beginPath();
+  BORDA.forEach(([lat, lon], i) => i ? g.lineTo(px(lon), py(lat)) : g.moveTo(px(lon), py(lat)));
+  g.closePath();
+  g.fillStyle = 'rgba(64,150,92,.55)'; g.fill();
+  g.strokeStyle = '#8fe0a8'; g.lineWidth = 2; g.stroke();
+  STATES.forEach(s => {
+    g.fillStyle = 'rgba(255,255,255,.25)';
+    g.beginPath(); g.arc(s.x * CELL + CELL / 2, s.y * CELL + CELL / 2, 2.5, 0, 7); g.fill();
+  });
+  g.fillStyle = 'rgba(255,255,255,.35)'; g.font = 'italic 14px Segoe UI';
+  g.fillText('Oceano Atlântico', 470 + MARGEM * CELL, 560 + MARGEM * CELL);
+  // parede visível: borda do quadro
+  g.strokeStyle = 'rgba(255,107,107,.75)'; g.lineWidth = 4; g.setLineDash([10, 8]);
+  g.strokeRect(2, 2, fundo.width - 4, fundo.height - 4); g.setLineDash([]);
+})();
+
+// ---------- Estado do jogo ----------
+let modo = 'capitais', nome = 'Benjamin';
+let snake, dir, fila, grow, vagoes, acertos, erros, stations, rodada, running = false, paused = false;
+let deck = [], visitados, fumaca = [], flash = null;
+
+function novoJogo() {
+  nome = ($('nome').value.trim() || 'Benjamin');
+  $('hNome').textContent = nome;
+  snake = [{ x: 14 + MARGEM, y: 12 + MARGEM }]; dir = [1, 0]; fila = []; grow = 0;
+  vagoes = []; acertos = 0; erros = 0; visitados = new Set(); fumaca = [];
+  deck = [];
+  $('hRecorde').textContent = lerRecorde(modo);
+  $('telaInicio').classList.add('hidden'); $('telaFim').classList.add('hidden');
+  setMsg('Boa viagem, maquinista ' + nome + '! 🚂', 'ok');
+  novaRodada(); atualizarHud();
+  running = true; paused = false; somApito();
+}
+
+function livre(s) {
+  return !snake.some(p => p.x === s.x && p.y === s.y) && dist(s, snake[0]) >= 4;
+}
+function proximaDoBaralho() {
+  if (!deck.length) deck = shuffle(STATES);
+  return deck.pop();
+}
+function escolherErradas(certa, pool, k) {
+  const res = [];
+  for (const s of shuffle(pool)) {
+    if (s === certa || !livre(s)) continue;
+    if ([certa, ...res].some(o => dist(o, s) < 3)) continue;
+    res.push(s); if (res.length === k) break;
+  }
+  return res;
+}
+
+function novaRodada() {
+  for (let tent = 0; tent < 60; tent++) {
+    const m = modo === 'misto' ? pick(['capitais', 'estados', 'regioes']) : modo;
+    let certa, pool, reg;
+    if (m === 'regioes') {
+      reg = pick(REGS);
+      certa = pick(STATES.filter(s => s.reg === reg && livre(s)));
+      pool = STATES.filter(s => s.reg !== reg);
+    } else {
+      certa = proximaDoBaralho(); pool = STATES;
+      if (!livre(certa)) { deck.unshift(certa); continue; }
+    }
+    if (!certa) continue;
+    const erradas = escolherErradas(certa, pool, 3);
+    if (erradas.length < 2) continue;
+    const rotulo = s => m === 'capitais' ? s.cap : m === 'estados' ? '?' : s.uf;
+    stations = shuffle([certa, ...erradas]).map(s => ({ st: s, certa: s === certa, label: rotulo(s) }));
+    rodada = { m, certa, reg };
+    if (m === 'capitais') $('pergunta').innerHTML = `Qual é a capital de <em>${certa.nome}</em>?`;
+    else if (m === 'estados') $('pergunta').innerHTML = `Leve o trem até o estado: <em>${certa.nome}</em>`;
+    else $('pergunta').innerHTML = `Leve o trem até um estado da Região <em>${reg}</em>`;
+    return;
+  }
+}
+
+function setMsg(t, cls) { const m = $('msg'); m.textContent = t; m.className = cls || ''; }
+function atualizarHud() {
+  $('hVagoes').textContent = vagoes.length; $('hAcertos').textContent = acertos;
+}
+
+function chegou(i) {
+  const est = stations[i], s = est.st;
+  if (est.certa) {
+    acertos++; grow++; vagoes.push(s.uf); visitados.add(s.uf);
+    flash = { x: s.x, y: s.y, cor: '#4cd07d', t: performance.now() };
+    somAcerto();
+    if (rodada.m === 'capitais') setMsg(`✅ Isso! ${s.cap} é a capital de ${s.nome}.`, 'ok');
+    else if (rodada.m === 'estados') setMsg(`✅ Isso! Aí é ${s.nome}, e a capital é ${s.cap}.`, 'ok');
+    else setMsg(`✅ Isso! ${s.nome} (${s.uf}) fica na Região ${s.reg}.`, 'ok');
+    novaRodada();
+  } else {
+    erros++;
+    flash = { x: s.x, y: s.y, cor: '#ff6b6b', t: performance.now() };
+    somErro();
+    const c = rodada.certa;
+    const certaTxt = rodada.m === 'capitais' ? `A capital de ${c.nome} é ${c.cap}.`
+                   : rodada.m === 'estados' ? `${c.nome} era a estação com a capital ${c.cap}.`
+                   : `${c.nome} (${c.uf}) é da Região ${rodada.reg}.`;
+    setMsg(`❌ Ali é ${s.nome} (${s.uf}), Região ${s.reg}. ${certaTxt}`, 'bad');
+    fimDeJogo(`parou na estação errada: ali é ${s.nome}. ${certaTxt}`);
+    return;
+  }
+  atualizarHud();
+}
+
+function fimDeJogo(motivo) {
+  running = false; somFim();
+  const rec = lerRecorde(modo), total = acertos;
+  const eu = total > 0 ? registrarPartida() : null;
+  $('fimMotivo').textContent = 'O trem ' + motivo.replace(/\.?$/, '.');
+  $('fimTexto').textContent = `Maquinista ${nome} acertou ${total} ${total === 1 ? 'pergunta' : 'perguntas'}!`;
+  if (total > rec) $('fimRecorde').textContent = '🏆 NOVO RECORDE! (antes era ' + rec + ')';
+  else $('fimRecorde').textContent = 'Recorde neste modo: ' + rec;
+  $('fimVisitados').textContent = visitados.size ? 'Estados visitados: ' + [...visitados].join(', ') : '';
+  $('fimRanking').innerHTML = `<p><b>Top 5 – ${MODO_NOME[modo]}</b></p>` + tabelaHTML(modo, eu, 5);
+  $('hRecorde').textContent = Math.max(rec, total);
+  $('telaFim').classList.remove('hidden');
+}
+
+const TOQUE = matchMedia('(pointer:coarse)').matches;      // no celular o trem anda um pouco mais devagar
+const velocidade = () => Math.max(TOQUE ? 110 : 85, (TOQUE ? 205 : 165) - acertos * 4);
+
+function passo() {
+  if (fila.length) dir = fila.shift();
+  const h = { x: snake[0].x + dir[0], y: snake[0].y + dir[1] };
+  if (h.x < 0 || h.y < 0 || h.x >= N || h.y >= N) return fimDeJogo('bateu na borda do mapa');
+  const corpo = grow > 0 ? snake : snake.slice(0, -1);
+  if (corpo.some(p => p.x === h.x && p.y === h.y)) return fimDeJogo('bateu nos próprios vagões');
+  snake.unshift(h);
+  if (grow > 0) grow--; else snake.pop();
+  fumaca.push({ x: h.x * CELL + CELL / 2, y: h.y * CELL + CELL / 2, vida: 1 });
+  const i = stations.findIndex(e => e.st.x === h.x && e.st.y === h.y);
+  if (i >= 0) chegou(i);
+}
+
+// ---------- Desenho ----------
+function retRedondo(x, y, w, h, r) {
+  ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function desenhar(t) {
+  ctx.drawImage(fundo, 0, 0);
+  if (!snake) return;
+
+  // estações
+  const pulso = 1 + Math.sin(t / 200) * 0.15;
+  ctx.font = 'bold 12px Segoe UI'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  stations.forEach(e => {
+    const cx = e.st.x * CELL + CELL / 2, cy = e.st.y * CELL + CELL / 2;
+    ctx.fillStyle = 'rgba(255,204,51,.25)';
+    ctx.beginPath(); ctx.arc(cx, cy, CELL * 0.95 * pulso, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffcc33'; ctx.strokeStyle = '#1a1a1a'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, CELL * 0.42, 0, 7); ctx.fill(); ctx.stroke();
+    const w = ctx.measureText(e.label).width + 12;
+    let lx = Math.min(Math.max(cx, w / 2 + 2), cv.width - w / 2 - 2);
+    let ly = cy - 20; if (ly < 12) ly = cy + 20;
+    ctx.fillStyle = 'rgba(15,27,45,.92)'; retRedondo(lx - w / 2, ly - 10, w, 20, 6); ctx.fill();
+    ctx.strokeStyle = '#ffcc33'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.fillText(e.label, lx, ly + 1);
+  });
+
+  // flash de acerto/erro
+  if (flash) {
+    const k = (t - flash.t) / 600;
+    if (k < 1) {
+      ctx.strokeStyle = flash.cor; ctx.globalAlpha = 1 - k; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(flash.x * CELL + CELL / 2, flash.y * CELL + CELL / 2, 8 + k * 40, 0, 7); ctx.stroke();
+      ctx.globalAlpha = 1;
+    } else flash = null;
+  }
+
+  // engates
+  ctx.strokeStyle = '#2b2b2b'; ctx.lineWidth = 3;
+  ctx.beginPath();
+  snake.forEach((p, i) => { const x = p.x * CELL + CELL / 2, y = p.y * CELL + CELL / 2; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); });
+  ctx.stroke();
+
+  // vagões
+  ctx.font = 'bold 9px Segoe UI';
+  for (let i = snake.length - 1; i >= 1; i--) {
+    const p = snake[i], uf = vagoes[i - 1], st = byUF[uf];
+    ctx.fillStyle = st ? REG_COR[st.reg] : '#888';
+    retRedondo(p.x * CELL + 1.5, p.y * CELL + 1.5, CELL - 3, CELL - 3, 3); ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.4)'; ctx.lineWidth = 1; ctx.stroke();
+    if (uf) { ctx.fillStyle = '#fff'; ctx.fillText(uf, p.x * CELL + CELL / 2, p.y * CELL + CELL / 2 + 1); }
+  }
+
+  // locomotiva
+  const h = snake[0];
+  ctx.save();
+  ctx.translate(h.x * CELL + CELL / 2, h.y * CELL + CELL / 2);
+  ctx.rotate(Math.atan2(dir[1], dir[0]));
+  ctx.fillStyle = '#c1121f'; retRedondo(-8, -7, 16, 14, 4); ctx.fill();
+  ctx.fillStyle = '#7a0b14'; ctx.fillRect(-8, -7, 6, 14);
+  ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(2, 0, 3, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(7, 0, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
+
+  // fumaça
+  fumaca.forEach(f => {
+    f.vida -= 0.02; f.y -= 0.3;
+    ctx.fillStyle = `rgba(220,220,220,${Math.max(0, f.vida) * 0.35})`;
+    ctx.beginPath(); ctx.arc(f.x, f.y, 3 + (1 - f.vida) * 6, 0, 7); ctx.fill();
+  });
+  fumaca = fumaca.filter(f => f.vida > 0);
+
+  if (paused && running) {
+    ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 40px Segoe UI'; ctx.fillText('⏸ Pausado', cv.width / 2, cv.height / 2);
+    ctx.font = '16px Segoe UI'; ctx.fillText(matchMedia('(pointer:coarse)').matches ? 'Toque numa seta para continuar' : 'Aperte Espaço para continuar', cv.width / 2, cv.height / 2 + 36);
+  }
+}
+
+let ultimo = 0, acc = 0;
+function frame(t) {
+  const dt = Math.min(250, t - ultimo); ultimo = t;
+  if (running && !paused) {
+    acc += dt;
+    while (running && acc >= velocidade()) { acc -= velocidade(); passo(); }
+  }
+  desenhar(t);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// ---------- Controles ----------
+const DIRS = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+               w: [0, -1], s: [0, 1], a: [-1, 0], d: [1, 0] };
+document.addEventListener('keydown', e => {
+  const noInput = e.target.tagName === 'INPUT';
+  if (e.key === 'Enter') {
+    if (!$('telaFim').classList.contains('hidden')) { e.preventDefault(); novoJogo(); }
+    else if (!$('telaInicio').classList.contains('hidden')) { e.preventDefault(); novoJogo(); }
+    return;
+  }
+  if (noInput) return;
+  if (e.key === ' ' && running) { e.preventDefault(); paused = !paused; return; }
+  const d = DIRS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+  if (!d || !running) return;
+  e.preventDefault();
+  virar(d);
+});
+function virar(d) {
+  if (!running) return;
+  if (paused) paused = false;
+  const ult = fila.length ? fila[fila.length - 1] : dir;
+  if ((d[0] === -ult[0] && d[1] === -ult[1]) || (d[0] === ult[0] && d[1] === ult[1])) return;
+  if (fila.length < 3) fila.push(d);
+}
+// Botões de seta na tela (toque)
+document.querySelectorAll('#dpad [data-d]').forEach(b => {
+  const d = b.dataset.d.split(',').map(Number);
+  b.addEventListener('pointerdown', e => { e.preventDefault(); virar(d); if (navigator.vibrate) navigator.vibrate(8); });
+});
+$('btnPausa').addEventListener('pointerdown', e => { e.preventDefault(); if (running) paused = !paused; });
+// Deslizar o dedo no mapa também dirige
+(function () {
+  let x0 = 0, y0 = 0, ativo = false;
+  const alvo = document;     // dá para deslizar em qualquer lugar da tela
+  alvo.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' || e.target.closest('#dpad, .overlay, a, input')) return;
+    ativo = true; x0 = e.clientX; y0 = e.clientY;
+  });
+  alvo.addEventListener('pointermove', e => {
+    if (!ativo) return;
+    const dx = e.clientX - x0, dy = e.clientY - y0;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) < 26) return;
+    virar(Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
+    x0 = e.clientX; y0 = e.clientY;
+  });
+  const fim = () => { ativo = false; };
+  alvo.addEventListener('pointerup', fim); alvo.addEventListener('pointercancel', fim);
+})();
+document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
+  modo = b.dataset.mode; b.blur(); novoJogo();
+}));
+$('btnDeNovo').onclick = e => { e.target.blur(); novoJogo(); };
+$('btnRanking').onclick = () => { $('telaInicio').classList.add('hidden'); $('telaRanking').classList.remove('hidden'); mostrarRanking(modo); };
+$('btnVoltar').onclick = () => { $('telaRanking').classList.add('hidden'); $('telaInicio').classList.remove('hidden'); };
+$('btnModo').onclick = () => { $('telaFim').classList.add('hidden'); $('telaInicio').classList.remove('hidden'); $('pergunta').textContent = '🚂 Trem do Brasil'; setMsg(''); };
+</script>
+<script>
+// Preenche o nome do maquinista com o perfil escolhido na Sala de Jogos
+(function () {
+  const a = Perfis.ativo(), campo = document.getElementById('nome');
+  if (a && campo) { campo.maxLength = 20; campo.value = a.avatar + ' ' + a.nome; }
+})();
+</script>
+</body>
+</html>
